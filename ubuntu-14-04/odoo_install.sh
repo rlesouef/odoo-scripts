@@ -3,7 +3,7 @@
 # Script for Installation: ODOO Saas4/Trunk server on Ubuntu 14.04 LTS
 # Author: André Schenkels, ICTSTUDIO 2014
 #-------------------------------------------------------------------------------
-#  
+#
 # This script will install ODOO Server on
 # clean Ubuntu 14.04 Server
 #-------------------------------------------------------------------------------
@@ -12,21 +12,21 @@
 # odoo-install
 #
 # EXAMPLE:
-# ./odoo-install 
+# ./odoo-install
 #
 ################################################################################
- 
+
 ##fixed parameters
 #openerp
 OE_USER="odoo"
 OE_HOME="/opt/$OE_USER"
 OE_HOME_EXT="/opt/$OE_USER/$OE_USER-server"
 
-#Enter version for checkout "8.0" for version 8.0, "7.0 (version 7), saas-4, saas-5 (opendays version) and "master" for trunk
-OE_VERSION="8.0"
+#Enter version for checkout "9.0" for version 9.0,"8.0" for version 8.0, "7.0 (version 7), saas-4, saas-5 (opendays version) and "master" for trunk
+OE_VERSION="9.0"
 
 #set the superadmin password
-OE_SUPERADMIN="superadminpassword"
+OE_SUPERADMIN="superpassword"
 OE_CONFIG="$OE_USER-server"
 
 #--------------------------------------------------
@@ -35,15 +35,21 @@ OE_CONFIG="$OE_USER-server"
 echo -e "\n---- Update Server ----"
 sudo apt-get update
 sudo apt-get upgrade -y
+sudo apt-get -y install wget ca-certificates curl htop tmux
 
 #--------------------------------------------------
 # Install PostgreSQL Server
 #--------------------------------------------------
+sudo sh -c "echo 'deb http://apt.postgresql.org/pub/repos/apt/ trusty-pgdg main' > /etc/apt/sources.list.d/pgdg.list"
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+sudo apt-get update
+
 echo -e "\n---- Install PostgreSQL Server ----"
-sudo apt-get install postgresql -y
-	
+sudo apt-get install -y postgresql-9.4
+# sudo apt-get install postgresql -y
+
 echo -e "\n---- PostgreSQL $PG_VERSION Settings  ----"
-sudo sed -i s/"#listen_addresses = 'localhost'"/"listen_addresses = '*'"/g /etc/postgresql/9.3/main/postgresql.conf
+sudo sed -i s/"#listen_addresses = 'localhost'"/"listen_addresses = '*'"/g /etc/postgresql/9.4/main/postgresql.conf
 
 echo -e "\n---- Creating the ODOO PostgreSQL User  ----"
 sudo su - postgres -c "createuser -s $OE_USER" 2> /dev/null || true
@@ -51,21 +57,32 @@ sudo su - postgres -c "createuser -s $OE_USER" 2> /dev/null || true
 #--------------------------------------------------
 # Install Dependencies
 #--------------------------------------------------
-echo -e "\n---- Install tool packages ----"
+echo -e "\n---- tool packages ----"
 sudo apt-get install wget subversion git bzr bzrtools python-pip -y
-	
-echo -e "\n---- Install python packages ----"
+
+echo -e "\n---- python packages ----"
 sudo apt-get install python-dateutil python-feedparser python-ldap python-libxslt1 python-lxml python-mako python-openid python-psycopg2 python-pybabel python-pychart python-pydot python-pyparsing python-reportlab python-simplejson python-tz python-vatnumber python-vobject python-webdav python-werkzeug python-xlwt python-yaml python-zsi python-docutils python-psutil python-mock python-unittest2 python-jinja2 python-pypdf python-decorator python-requests python-passlib python-pil -y
-	
-echo -e "\n---- Install python libraries ----"
+
+echo -e "\n---- python libraries ----"
 sudo pip install gdata
 
+echo -e "\n---- nodejs et npm ----"
+# user normal
+curl -sL https://deb.nodesource.com/setup_0.12 | sudo bash -
+sudo apt-get install -y nodejs
+sudo npm install -g npm
+# install Less and accessories:
+sudo npm install -g less less-plugin-clean-css
+
+
 echo -e "\n---- Install wkhtml and place on correct place for ODOO 8 ----"
-sudo wget http://download.gna.org/wkhtmltopdf/0.12/0.12.1/wkhtmltox-0.12.1_linux-trusty-amd64.deb
-sudo dpkg -i wkhtmltox-0.12.1_linux-trusty-amd64.deb
+sudo apt-get install xfonts-75dpi xfonts-base -y
+sudo apt-get -f install
+sudo wget http://download.gna.org/wkhtmltopdf/0.12/0.12.2.1/wkhtmltox-0.12.2.1_linux-trusty-amd64.deb
+sudo dpkg -i wkhtmltox-0.12.2.1_linux-trusty-amd64.deb
 sudo cp /usr/local/bin/wkhtmltopdf /usr/bin
 sudo cp /usr/local/bin/wkhtmltoimage /usr/bin
-	
+
 echo -e "\n---- Create ODOO system user ----"
 sudo adduser --system --quiet --shell=/bin/bash --home=$OE_HOME --gecos 'ODOO' --group $OE_USER
 
@@ -77,7 +94,9 @@ sudo chown $OE_USER:$OE_USER /var/log/$OE_USER
 # Install ODOO
 #--------------------------------------------------
 echo -e "\n==== Installing ODOO Server ===="
-sudo git clone --branch $OE_VERSION https://www.github.com/odoo/odoo $OE_HOME_EXT/
+# sudo git clone --branch $OE_VERSION https://www.github.com/odoo/odoo $OE_HOME_EXT/
+sudo git clone --branch $OE_VERSION https://www.github.com/odoo/odoo --depth 1 --single-branch $OE_HOME_EXT/
+
 
 echo -e "\n---- Create custom module directory ----"
 sudo su $OE_USER -c "mkdir $OE_HOME/custom"
@@ -185,8 +204,13 @@ sudo chown root: /etc/init.d/$OE_CONFIG
 
 echo -e "* Start ODOO on Startup"
 sudo update-rc.d $OE_CONFIG defaults
- 
-sudo service $OE_CONFIG start
-echo "Done! The ODOO server can be started with: service $OE_CONFIG start"
 
+sudo service $OE_CONFIG start
+echo "------"
+echo "Done! The ODOO server can be started with: service $OE_CONFIG start"
+echo "------"
+echo "Pour accéder à Odoo sur le port 80"
+echo "Modify '/etc/rc.local', add at the end of file:"
+echo "iptables -t nat -A PREROUTING -p tcp –dport 80 -j REDIRECT –to-port 8069"
+echo 
 
